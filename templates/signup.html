@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-4 bg-white rounded shadow">
+  <h4>Create account</h4>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input name="username" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Display name (optional)</label>
+      <input name="display_name" class="form-control">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input name="password" type="password" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Role</label>
+      <select name="role" class="form-select">
+        <option value="user">User</option>
+        <option value="admin">Admin (for demo)</option>
+      </select>
+      <div class="form-text">Choose 'admin' only for demo / testing. In production you'd restrict admin creation.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Sign up</button>
+  </form>
+</div>
+{% endblock %}

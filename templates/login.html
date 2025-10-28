@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-4 bg-white rounded shadow">
+  <h4>Login</h4>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input name="username" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input name="password" type="password" class="form-control" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Login</button>
+  </form>
+
+  <hr>
+  <h6>Or quick-switch (demo accounts)</h6>
+  <div>
+    {% for u in users %}
+        <a class="btn btn-outline-secondary btn-sm me-1 mb-1"
+            href="{{ url_for('quick_switch', username=u['username']) }}">
+            {{ u['username'] }} ({{ u['role'] }})
+        </a>
+    {% endfor %}
+
+  </div>
+</div>
+{% endblock %}

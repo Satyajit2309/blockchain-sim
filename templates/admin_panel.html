@@ -1,37 +1,43 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="p-3 bg-white rounded shadow">
-    <h4>Admin Panel (Simulated Voting)</h4>
-    <p>Admins: {{ admins|join(', ') }}</p>
+<div class="p-3 bg-white rounded shadow">
+  <h4>Admin Panel (Simulated Voting)</h4>
+  <p>Admins in network: {{ admins|join(', ') }}</p>
 
-    <h5>Pending Transactions</h5>
-    {% if pending %}
-      <div class="list-group">
-        {% for tx in pending %}
-          <div class="list-group-item">
-            <div><strong>TX ID:</strong> {{ tx.tx_id }}</div>
-            <div><strong>Type:</strong> {{ tx.tx.type }}</div>
-            <div><strong>Payload:</strong> {{ tx.tx.payload }}</div>
+  <h5>Pending Transactions</h5>
+  {% if pending %}
+    <div class="list-group">
+      {% for tx in pending %}
+        <div class="list-group-item">
+          <div><strong>TX ID:</strong> {{ tx.tx_id }}</div>
+          <div><strong>Type:</strong> {{ tx.tx.type }}</div>
+          <div><strong>Payload:</strong> {{ tx.tx.payload }}</div>
+          <div class="mt-2">
+            <strong>Votes:</strong>
+            <span id="votes-{{ tx.tx_id }}">
+              {% set v = votes.get(tx.tx_id, {}) %}
+              {{ v }}
+            </span>
             <div class="mt-2">
-              <strong>Votes:</strong>
-              <span id="votes-{{ tx.tx_id }}">
-                {% set v = votes.get(tx.tx_id, {}) %}
-                {{ v }}
-              </span>
-              <div class="mt-2">
-                {% for admin in admins %}
-                  <button class="btn btn-sm btn-outline-success vote-btn" data-tx="{{ tx.tx_id }}" data-admin="{{ admin }}" data-vote="approve">{{ admin }} Approve</button>
-                  <button class="btn btn-sm btn-outline-danger vote-btn" data-tx="{{ tx.tx_id }}" data-admin="{{ admin }}" data-vote="reject">{{ admin }} Reject</button>
-                {% endfor %}
-              </div>
+              {% if user.role == 'admin' %}
+                {% set voted = (user.username in (votes.get(tx.tx_id, {})|default({})).keys()) %}
+                <button class="btn btn-sm btn-success vote-btn" data-tx="{{ tx.tx_id }}" data-vote="approve" {% if voted %}disabled{% endif %}>Approve as {{ user.username }}</button>
+                <button class="btn btn-sm btn-danger vote-btn" data-tx="{{ tx.tx_id }}" data-vote="reject" {% if voted %}disabled{% endif %}>Reject as {{ user.username }}</button>
+              {% else %}
+                <div class="text-muted">Login as an admin to vote.</div>
+              {% endif %}
+            </div>
+            <div class="mt-2">
+              <small class="text-muted">Submitted: {{ tx.time_submitted }}</small>
             </div>
           </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="alert alert-secondary">No pending transactions</div>
-    {% endif %}
-  </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-secondary">No pending transactions</div>
+  {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -39,16 +45,16 @@
 document.querySelectorAll(".vote-btn").forEach(btn => {
   btn.addEventListener("click", async () => {
     const tx = btn.dataset.tx;
-    const admin = btn.dataset.admin;
     const vote = btn.dataset.vote;
+    btn.disabled = true;
     const resp = await fetch("/vote", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({tx_id: tx, admin: admin, vote: vote})
+      body: JSON.stringify({tx_id: tx, vote: vote})
     });
     const data = await resp.json();
     console.log(data);
-    // simple reload to reflect state — lightweight
+    // reload to show tallies / state
     location.reload();
   });
 });

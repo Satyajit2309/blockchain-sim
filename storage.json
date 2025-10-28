@@ -34,13 +34,64 @@
       "previous_hash": "0714c687096e6de54624e9b066f008c50cc848be0447af4c2f1edfbcc2218fb1",
       "nonce": 23,
       "hash": "001a7301243815739474433a1170e2649551a183d9a16df43193d212563694d8"
+    },
+    {
+      "index": 2,
+      "timestamp": 1761642700.3358574,
+      "transactions": [
+        {
+          "tx_id": "dd12085d5944667553988c4af169107ed23fc65e9a0513a4c4916946c6331197",
+          "tx": {
+            "type": "register_vehicle",
+            "payload": {
+              "vin": "adcs",
+              "owner": "alice",
+              "action": "register_vehicle",
+              "meta": {
+                "submitted_by": "alice"
+              }
+            },
+            "requested_by": "alice",
+            "time": 1761642673.9536858
+          },
+          "time_submitted": 1761642673.953837,
+          "status": "accepted"
+        }
+      ],
+      "previous_hash": "001a7301243815739474433a1170e2649551a183d9a16df43193d212563694d8",
+      "nonce": 55,
+      "hash": "00466215e9fc5027768cc6bac5a0172c9610fdbf126cc6c000a656cdbc1b48f2"
     }
   ],
-  "pending_transactions": [],
+  "pending_transactions": [
+    {
+      "tx_id": "a62b48c8b01fe239ac28439b6fa29c4ea8a0e4ca7fc998081224462d0bd6fcc3",
+      "tx": {
+        "type": "register_vehicle",
+        "payload": {
+          "vin": "itsmycar",
+          "owner": "owner1",
+          "action": "register_vehicle",
+          "meta": {
+            "submitted_by": "owner1"
+          }
+        },
+        "requested_by": "owner1",
+        "time": 1761643110.609152
+      },
+      "time_submitted": 1761643110.6091967,
+      "status": "pending"
+    }
+  ],
   "admins": [
     "alice",
     "bob",
-    "carol"
+    "carol",
+    "MoSalah11"
   ],
-  "votes": {}
+  "votes": {
+    "a62b48c8b01fe239ac28439b6fa29c4ea8a0e4ca7fc998081224462d0bd6fcc3": {
+      "MoSalah11": "approve"
+    }
+  }
 }

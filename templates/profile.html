@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-4 bg-white rounded shadow">
+  <h4>Profile</h4>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input class="form-control" value="{{ user.username }}" disabled>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Display name</label>
+      <input name="display_name" class="form-control" value="{{ user.display_name }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">New password (leave blank to keep)</label>
+      <input name="password" type="password" class="form-control">
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+</div>
+{% endblock %}
