@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="p-4 bg-white rounded shadow">
+    <h3>Welcome to Vehicle Blockchain Simulation</h3>
+    <p>Pending transactions: <strong>{{ pending_count }}</strong></p>
+    <p>Try registering a vehicle, then go to the Admin Panel to approve it.</p>
+    <a class="btn btn-primary" href="{{ url_for('add_vehicle') }}">Register Vehicle</a>
+    <a class="btn btn-secondary" href="{{ url_for('admin_panel') }}">Admin Panel</a>
+  </div>
+{% endblock %}

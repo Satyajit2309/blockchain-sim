@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="p-3 bg-white rounded shadow">
+    <h4>Vehicle History for VIN: {{ vin }}</h4>
+    {% if history %}
+      <ul class="list-group">
+        {% for ev in history %}
+          <li class="list-group-item">
+            <div><strong>Block:</strong> {{ ev.block_index }} — <strong>TX:</strong> {{ ev.tx_id }}</div>
+            <div><strong>Type:</strong> {{ ev.type }}</div>
+            <div><strong>Payload:</strong> {{ ev.payload }}</div>
+            <div><strong>When:</strong> {{ ev.timestamp }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="alert alert-secondary">No history found for this VIN.</div>
+    {% endif %}
+  </div>
+{% endblock %}

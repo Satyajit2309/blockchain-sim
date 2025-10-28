@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="p-3 bg-white rounded shadow">
+    <h4>Blockchain Explorer (Simulated)</h4>
+    <div class="accordion" id="chainAccordion">
+      {% for block in chain %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading{{ loop.index }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
+              Block #{{ block.index }} — Hash: {{ block.hash[:20] }}...
+            </button>
+          </h2>
+          <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#chainAccordion">
+            <div class="accordion-body">
+              <p><strong>Index:</strong> {{ block.index }}</p>
+              <p><strong>Timestamp:</strong> {{ block.timestamp }}</p>
+              <p><strong>Previous Hash:</strong> {{ block.previous_hash[:30] }}...</p>
+              <p><strong>Nonce:</strong> {{ block.nonce }}</p>
+              <p><strong>Transactions:</strong></p>
+              <ul>
+              {% for tx in block.transactions %}
+                <li><strong>{{ tx.tx.type }}</strong> — {{ tx.tx.payload }}</li>
+              {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

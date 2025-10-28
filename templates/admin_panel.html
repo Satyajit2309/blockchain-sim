@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="p-3 bg-white rounded shadow">
+    <h4>Admin Panel (Simulated Voting)</h4>
+    <p>Admins: {{ admins|join(', ') }}</p>
+
+    <h5>Pending Transactions</h5>
+    {% if pending %}
+      <div class="list-group">
+        {% for tx in pending %}
+          <div class="list-group-item">
+            <div><strong>TX ID:</strong> {{ tx.tx_id }}</div>
+            <div><strong>Type:</strong> {{ tx.tx.type }}</div>
+            <div><strong>Payload:</strong> {{ tx.tx.payload }}</div>
+            <div class="mt-2">
+              <strong>Votes:</strong>
+              <span id="votes-{{ tx.tx_id }}">
+                {% set v = votes.get(tx.tx_id, {}) %}
+                {{ v }}
+              </span>
+              <div class="mt-2">
+                {% for admin in admins %}
+                  <button class="btn btn-sm btn-outline-success vote-btn" data-tx="{{ tx.tx_id }}" data-admin="{{ admin }}" data-vote="approve">{{ admin }} Approve</button>
+                  <button class="btn btn-sm btn-outline-danger vote-btn" data-tx="{{ tx.tx_id }}" data-admin="{{ admin }}" data-vote="reject">{{ admin }} Reject</button>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-secondary">No pending transactions</div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".vote-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const tx = btn.dataset.tx;
+    const admin = btn.dataset.admin;
+    const vote = btn.dataset.vote;
+    const resp = await fetch("/vote", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({tx_id: tx, admin: admin, vote: vote})
+    });
+    const data = await resp.json();
+    console.log(data);
+    // simple reload to reflect state — lightweight
+    location.reload();
+  });
+});
+</script>
+{% endblock %}

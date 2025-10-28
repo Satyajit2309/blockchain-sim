@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="p-4 bg-white rounded shadow">
+    <h4>Register a Vehicle (Simulated)</h4>
+    {% if message %}
+      <div class="alert alert-info">{{ message }}</div>
+    {% endif %}
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">VIN</label>
+        <input name="vin" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Owner Name</label>
+        <input name="owner" class="form-control" required>
+      </div>
+      <button class="btn btn-success" type="submit">Submit Transaction</button>
+    </form>
+  </div>
+{% endblock %}
