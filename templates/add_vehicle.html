@@ -1,20 +1,34 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="p-4 bg-white rounded shadow">
-    <h4>Register a Vehicle (Simulated)</h4>
-    {% if message %}
-      <div class="alert alert-info">{{ message }}</div>
-    {% endif %}
+    <h4>Register a Vehicle</h4>
+    <p class="text-muted">Submit your vehicle for registration. This will require admin approval via consensus.</p>
+    
     <form method="post">
       <div class="mb-3">
-        <label class="form-label">VIN</label>
-        <input name="vin" class="form-control" required>
+        <label class="form-label">Vehicle Identification Number (VIN)</label>
+        <input name="vin" class="form-control" required 
+               placeholder="e.g., 1HGBH41JXMN109186"
+               pattern="[A-Z0-9]+"
+               title="VIN must contain only uppercase letters and numbers">
+        <div class="form-text">Enter the 17-character VIN. It will be automatically converted to uppercase.</div>
       </div>
+      
       <div class="mb-3">
-        <label class="form-label">Owner Name</label>
-        <input name="owner" class="form-control" required>
+        <label class="form-label">Owner</label>
+        <input class="form-control" value="{{ user.display_name or user.username }}" disabled>
+        <div class="form-text">Vehicle will be registered under your account</div>
       </div>
-      <button class="btn btn-success" type="submit">Submit Transaction</button>
+      
+      <button class="btn btn-success" type="submit">Submit for Admin Approval</button>
+      <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
     </form>
   </div>
+
+  <script>
+    // Auto-uppercase VIN input
+    document.querySelector('input[name="vin"]').addEventListener('input', function(e) {
+      e.target.value = e.target.value.toUpperCase();
+    });
+  </script>
 {% endblock %}

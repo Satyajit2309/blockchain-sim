@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="p-3 bg-white rounded shadow">
+    <h4>Garage Consensus Panel</h4>
+    <p class="text-muted">Vote on pending service records to reach consensus before adding them to the blockchain.</p>
+
+    <div class="mb-3">
+      <a href="{{ url_for('garage_add_service') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Submit New Service Record
+      </a>
+    </div>
+
+    {% if pending %}
+      <h5 class="mt-4">Pending Service Records</h5>
+      <p class="text-muted">{{ garages|length }} garage(s) registered. Consensus requires majority approval.</p>
+
+      <div class="list-group">
+        {% for record in pending %}
+          <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <h6 class="mb-1">
+                  <span class="badge bg-info">VIN: {{ record.tx.payload.vin }}</span>
+                </h6>
+                <p class="mb-1"><strong>Submitted by:</strong> {{ record.tx.payload.garage }}</p>
+              </div>
+              <span class="badge bg-warning">
+                {% set v = votes.get(record.tx_id, {}) %}
+                Votes: {{ v.values()|list|selectattr('__eq__', 'approve')|list|length }} / {{ (garages|length // 2) + 1 }}
+              </span>
+            </div>
+
+            <div class="card mb-2">
+              <div class="card-body">
+                <h6>Service Description:</h6>
+                <p class="mb-0">{{ record.tx.payload.description }}</p>
+              </div>
+            </div>
+
+            <div class="small text-muted mb-2">
+              <strong>Transaction ID:</strong> <code>{{ record.tx_id }}</code><br>
+              <strong>Timestamp:</strong> {{ record.time_submitted }}
+            </div>
+
+            <div class="mt-2">
+              {% if user.role == 'garage' %}
+                {% set voted = (user.username in (votes.get(record.tx_id, {})|default({})).keys()) %}
+                {% if voted %}
+                  <span class="badge bg-secondary">You voted: {{ votes.get(record.tx_id, {}).get(user.username) }}</span>
+                {% else %}
+                  <button class="btn btn-sm btn-success vote-btn me-2" data-tx="{{ record.tx_id }}" data-vote="approve">
+                    ✓ Approve as {{ user.username }}
+                  </button>
+                  <button class="btn btn-sm btn-danger vote-btn" data-tx="{{ record.tx_id }}" data-vote="reject">
+                    ✗ Reject as {{ user.username }}
+                  </button>
+                {% endif %}
+              {% else %}
+                <div class="text-muted">Login as a garage to vote.</div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-info mt-4">
+        <i class="bi bi-info-circle"></i> No pending service records. Submit a new service record to get started.
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".vote-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const tx = btn.dataset.tx;
+    const vote = btn.dataset.vote;
+    btn.disabled = true;
+    const resp = await fetch("/vote", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({tx_id: tx, vote: vote})
+    });
+    const data = await resp.json();
+    console.log(data);
+    // reload to show tallies / state
+    location.reload();
+  });
+});
+</script>
+{% endblock %}

@@ -4,29 +4,81 @@
   <meta charset="utf-8">
   <title>Vehicle Blockchain Simulation</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="bg-light">
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
-      <a class="navbar-brand" href="{{ url_for('index') }}">Vehicle-Chain Sim</a>
-      <div class="navbar-nav me-auto">
-            {% if user and user.role == 'user' %}
-                <a class="nav-link" href="{{ url_for('add_vehicle') }}">Register Vehicle</a>
+      <a class="navbar-brand" href="{{ url_for('index') }}">
+        <i class="bi bi-link-45deg"></i> Vehicle-Chain Sim
+      </a>
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          {% if user %}
+            {% if user.role == 'user' %}
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('add_vehicle') }}">
+                  <i class="bi bi-car-front"></i> Register Vehicle
+                </a>
+              </li>
+            {% elif user.role == 'admin' %}
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('admin_panel') }}">
+                  <i class="bi bi-shield-check"></i> Admin Panel
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('add_garage') }}">
+                  <i class="bi bi-building-add"></i> Propose Garage
+                </a>
+              </li>
+            {% elif user.role == 'garage' %}
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('garage_panel') }}">
+                  <i class="bi bi-wrench"></i> Garage Panel
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('garage_add_service') }}">
+                  <i class="bi bi-file-earmark-plus"></i> Add Service
+                </a>
+              </li>
             {% endif %}
-        <a class="nav-link" href="{{ url_for('admin_panel') }}">Admin Panel</a>
-        <a class="nav-link" href="{{ url_for('explorer') }}">Explorer</a>
-      </div>
+          {% endif %}
+          
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('explorer') }}">
+              <i class="bi bi-layers"></i> Explorer
+            </a>
+          </li>
+        </ul>
 
-      <div class="d-flex align-items-center">
-        {% if user %}
-          <div class="text-white me-3">Signed in as <strong>{{ user.display_name or user.username }}</strong> ({{ user.role }})</div>
-          <a class="btn btn-outline-light btn-sm me-2" href="{{ url_for('profile') }}">Profile</a>
-          <a class="btn btn-outline-light btn-sm me-2" href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-          <a class="btn btn-outline-light btn-sm me-2" href="{{ url_for('login') }}">Login</a>
-          <a class="btn btn-light btn-sm me-2" href="{{ url_for('signup') }}">Sign up</a>
-        {% endif %}
+        <div class="d-flex align-items-center">
+          {% if user %}
+            <div class="text-white me-3">
+              <i class="bi bi-person-circle"></i> 
+              <strong>{{ user.display_name or user.username }}</strong> 
+              <span class="badge bg-{{ 'primary' if user.role == 'admin' else ('success' if user.role == 'garage' else 'secondary') }}">
+                {{ user.role }}
+              </span>
+            </div>
+            <a class="btn btn-outline-light btn-sm me-2" href="{{ url_for('profile') }}">
+              <i class="bi bi-gear"></i> Profile
+            </a>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+          {% else %}
+            <a class="btn btn-outline-light btn-sm me-2" href="{{ url_for('login') }}">Login</a>
+            <a class="btn btn-light btn-sm" href="{{ url_for('signup') }}">Sign up</a>
+          {% endif %}
+        </div>
       </div>
     </div>
   </nav>
