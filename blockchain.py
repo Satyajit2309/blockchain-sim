@@ -2,9 +2,11 @@
 import time
 import json
 import hashlib
+import os
 from typing import List, Dict, Any, Optional
 
 STORAGE_FILE = "storage.json"
+VEHICLE_CHAINS_DIR = "vehicle_chains"
 
 def sha256(data: str) -> str:
     return hashlib.sha256(data.encode('utf-8')).hexdigest()
@@ -44,8 +46,8 @@ class Blockchain:
         self.chain: List[Block] = []
         self.pending_transactions: List[Dict[str,Any]] = []
         self.admins = admins or ["admin1", "admin2", "admin3"]
-        self.garages = garages or []           # <-- new: garage network
-        self.votes: Dict[str, Dict[str,str]] = {}  # tx_id -> {admin/garage: vote}
+        self.garages = garages or []
+        self.votes: Dict[str, Dict[str,str]] = {}
         self.load_from_file()
 
         if not self.chain:
@@ -53,6 +55,12 @@ class Blockchain:
             self.chain.append(genesis)
             self.save_to_file()
 
+        # ensure vehicle chains dir exists
+        os.makedirs(VEHICLE_CHAINS_DIR, exist_ok=True)
+
+    # -------------------------
+    # Global chain & pending tx
+    # -------------------------
     def new_transaction(self, tx: Dict[str,Any]) -> str:
         tx_id = sha256(json.dumps(tx, sort_keys=True) + str(time.time()))
         tx_record = {
@@ -67,11 +75,6 @@ class Blockchain:
         return tx_id
 
     def cast_vote(self, tx_id: str, voter: str, vote: str) -> Dict[str,Any]:
-        """
-        voter = admin username (for admin-level votes) OR garage username (for garage-level votes)
-        vote = 'approve' or 'reject'
-        Logic same as before; returns result. If tx accepted, it finalizes into a block.
-        """
         if tx_id not in self.votes:
             return {"error": "transaction not found"}
 
@@ -86,15 +89,10 @@ class Blockchain:
         approve_count = sum(1 for v in votes.values() if v == "approve")
         reject_count = sum(1 for v in votes.values() if v == "reject")
 
-        # determine which validator set applies:
-        # if tx.tx.type == 'propose_garage' or 'register_vehicle' -> use admins
-        # if tx.tx.type == 'add_service' -> use garages
         tx_record = next((t for t in self.pending_transactions if t["tx_id"] == tx_id), None)
         if not tx_record:
-            # maybe already finalized; but allow vote recording earlier only
-            # fallback to admins majority
-            total_admins = len(self.admins)
-            majority = total_admins // 2 + 1
+            # fallback majority to admins
+            total = len(self.admins)
         else:
             tx_type = tx_record["tx"].get("type")
             if tx_type in ("propose_garage", "register_vehicle"):
@@ -103,27 +101,39 @@ class Blockchain:
                 total = len(self.garages) if len(self.garages) > 0 else 1
             else:
                 total = len(self.admins)
-            majority = total // 2 + 1
 
+        majority = (total // 2) + 1
         result = {"approve_count": approve_count, "reject_count": reject_count, "majority": majority}
 
+        # If majority reached
         if approve_count >= majority:
             if tx_record:
                 tx_record["status"] = "accepted"
-                self._add_block([tx_record])
-                # remove from pending
-                self.pending_transactions = [t for t in self.pending_transactions if t["tx_id"] != tx_id]
-                # cleanup votes
-                if tx_id in self.votes:
-                    del self.votes[tx_id]
-                self.save_to_file()
-                result["finalized"] = "accepted"
-                result["tx"] = tx_record  # return tx for caller convenience
+                # Special-case: service records go to vehicle-specific chain instead of global chain.
+                tx_type = tx_record["tx"].get("type")
+                if tx_type == "add_service":
+                    # mark accepted, remove pending, cleanup votes; actual vehicle-block write done externally (so caller can act)
+                    self.pending_transactions = [t for t in self.pending_transactions if t["tx_id"] != tx_id]
+                    if tx_id in self.votes:
+                        del self.votes[tx_id]
+                    self.save_to_file()
+                    result["finalized"] = "accepted"
+                    result["tx"] = tx_record
+                else:
+                    # default: add to global chain
+                    self._add_block([tx_record])
+                    self.pending_transactions = [t for t in self.pending_transactions if t["tx_id"] != tx_id]
+                    if tx_id in self.votes:
+                        del self.votes[tx_id]
+                    self.save_to_file()
+                    result["finalized"] = "accepted"
+                    result["tx"] = tx_record
             else:
                 result["error"] = "tx not in pending list"
         elif reject_count >= majority:
             if tx_record:
                 tx_record["status"] = "rejected"
+                # remove pending and votes
                 self.pending_transactions = [t for t in self.pending_transactions if t["tx_id"] != tx_id]
                 if tx_id in self.votes:
                     del self.votes[tx_id]
@@ -141,7 +151,6 @@ class Blockchain:
         index = len(self.chain)
         previous_hash = self.chain[-1].hash
         new_block = Block(index=index, timestamp=time.time(), transactions=transactions, previous_hash=previous_hash)
-        # light mining
         target_prefix = "00"
         while not new_block.hash.startswith(target_prefix):
             new_block.nonce += 1
@@ -157,22 +166,112 @@ class Blockchain:
             return self.chain[index].to_dict()
         return None
 
-    def get_vehicle_history(self, vin: str) -> List[Dict[str,Any]]:
-        history = []
+    # -------------------------
+    # Vehicle-specific chain ops
+    # -------------------------
+    def _vehicle_chain_path(self, vin: str) -> str:
+        safe_vin = vin.replace("/", "_").upper()
+        return os.path.join(VEHICLE_CHAINS_DIR, f"{safe_vin}.json")
+
+    def ensure_vehicle_chain(self, vin: str):
+        path = self._vehicle_chain_path(vin)
+        if not os.path.exists(path):
+            # create genesis block for vehicle
+            genesis = {
+                "vin": vin,
+                "chain": [
+                    {
+                        "index": 0,
+                        "timestamp": time.time(),
+                        "transactions": [],
+                        "previous_hash": "0",
+                        "nonce": 0,
+                        "hash": sha256(f"genesis-{vin}-{time.time()}")
+                    }
+                ]
+            }
+            with open(path, "w") as f:
+                json.dump(genesis, f, indent=2)
+
+    def get_vehicle_chain(self, vin: str) -> Dict[str,Any]:
+        path = self._vehicle_chain_path(vin)
+        if not os.path.exists(path):
+            return {"vin": vin, "chain": []}
+        with open(path, "r") as f:
+            return json.load(f)
+
+    def add_service_block_to_vehicle(self, vin: str, tx_record: Dict[str,Any]) -> Dict[str,Any]:
+        """
+        tx_record is the pending tx record that was accepted (status = 'accepted').
+        This method appends a new block to the vehicle's chain containing that tx_record.
+        """
+        self.ensure_vehicle_chain(vin)
+        path = self._vehicle_chain_path(vin)
+        with open(path, "r") as f:
+            data = json.load(f)
+
+        chain = data.get("chain", [])
+        index = len(chain)
+        previous_hash = chain[-1]["hash"] if chain else "0"
+        transactions = [tx_record]
+        # build block dict & compute hash with PoW
+        block = {
+            "index": index,
+            "timestamp": time.time(),
+            "transactions": transactions,
+            "previous_hash": previous_hash,
+            "nonce": 0,
+            "hash": ""
+        }
+        # compute hash until it starts with target prefix
+        target_prefix = "00"
+        while True:
+            block["hash"] = sha256(json.dumps({
+                "index": block["index"],
+                "timestamp": block["timestamp"],
+                "transactions": block["transactions"],
+                "previous_hash": block["previous_hash"],
+                "nonce": block["nonce"]
+            }, sort_keys=True))
+            if block["hash"].startswith(target_prefix):
+                break
+            block["nonce"] += 1
+
+        chain.append(block)
+        data["chain"] = chain
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+        return block
+
+    # -------------------------
+    # vehicle-history search (global chain + vehicle chain)
+    # -------------------------
+    def get_vehicle_history(self, vin: str) -> Dict[str,Any]:
+        """
+        Return an object containing:
+          - global_events: service/registration events found in global chain
+          - vehicle_chain: per-vehicle chain file (if any)
+        """
+        global_events = []
         for block in self.chain:
             for tx_record in block.transactions:
                 tx = tx_record.get("tx", {})
                 payload = tx.get("payload", {})
                 if payload.get("vin") == vin:
-                    history.append({
+                    global_events.append({
                         "block_index": block.index,
                         "tx_id": tx_record.get("tx_id"),
                         "type": tx.get("type"),
                         "payload": payload,
                         "timestamp": block.timestamp
                     })
-        return history
+        vehicle_chain = self.get_vehicle_chain(vin)
+        return {"global_events": global_events, "vehicle_chain": vehicle_chain}
 
+    # -------------------------
+    # persistence
+    # -------------------------
     def save_to_file(self):
         data = {
             "chain": [b.to_dict() for b in self.chain],
