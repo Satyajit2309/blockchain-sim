@@ -9,12 +9,12 @@ from blockchain import Blockchain
 DB_PATH = "users.db"
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-for-demo")  # replace in production
-bc = Blockchain(admins=["alice", "bob", "carol"])  # keep admin list for consensus logic
+app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-for-demo")
 
-# -------------------------
-# Simple SQLite user helpers
-# -------------------------
+# initialize blockchain with default admins (these will be synced with DB on startup)
+bc = Blockchain(admins=["alice", "bob", "carol"], garages=[])
+
+# --- DB helpers (same as before) ---
 def get_db():
     db = getattr(g, "_database", None)
     if db is None:
@@ -36,32 +36,11 @@ def init_db():
     """)
     db.commit()
 
-def create_user(username, password, role="user", display_name=None):
-    db = get_db()
-    cur = db.cursor()
-    ph = generate_password_hash(password)
-    try:
-        cur.execute("INSERT INTO users (username, password_hash, role, display_name) VALUES (?, ?, ?, ?)",
-                    (username, ph, role, display_name or username))
-        db.commit()
-
-        # ✅ Automatically add to blockchain admin network if the new user is an admin
-        if role == "admin" and username not in bc.admins:
-            bc.admins.append(username)
-            bc.save_to_file()
-            print(f"[Network Update] New admin '{username}' added to blockchain network.")
-
-        return True
-    except sqlite3.IntegrityError:
-        return False
-
-
 def get_user_by_username(username):
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT * FROM users WHERE username = ?", (username,))
-    row = cur.fetchone()
-    return row
+    return cur.fetchone()
 
 def get_all_users():
     db = get_db()
@@ -81,15 +60,35 @@ def update_profile(username, display_name, password=None):
                     (display_name, username))
     db.commit()
 
+def create_user(username, password, role="user", display_name=None):
+    db = get_db()
+    cur = db.cursor()
+    ph = generate_password_hash(password)
+    try:
+        cur.execute("INSERT INTO users (username, password_hash, role, display_name) VALUES (?, ?, ?, ?)",
+                    (username, ph, role, display_name or username))
+        db.commit()
+        # If new admin, add to bc.admins
+        if role == "admin" and username not in bc.admins:
+            bc.admins.append(username)
+            bc.save_to_file()
+            print(f"[Network Update] New admin '{username}' added to blockchain network.")
+        # If new garage, add to bc.garages
+        if role == "garage" and username not in bc.garages:
+            bc.garages.append(username)
+            bc.save_to_file()
+            print(f"[Network Update] New garage '{username}' added to garage network.")
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
 @app.teardown_appcontext
 def close_connection(exception):
     db = getattr(g, "_database", None)
     if db is not None:
         db.close()
 
-# -------------------------
-# Authentication utilities
-# -------------------------
+# --- Auth helpers (same as before) ---
 def login_user(row):
     session["username"] = row["username"]
     session["role"] = row["role"]
@@ -113,29 +112,34 @@ def login_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
-# -------------------------
-# App startup: ensure DB + demo users
-# -------------------------
-    # ✅ Sync all current admins from DB into the blockchain network
+# --- App startup & demo users ---
+with app.app_context():
+    init_db()
+    # create demo users if missing
+    for u, role in [("alice", "admin"), ("bob", "admin"), ("carol", "admin"), ("owner1", "user")]:
+        if not get_user_by_username(u):
+            create_user(u, "password", role=role, display_name=u.capitalize())
+    # Sync admins from DB into blockchain
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT username FROM users WHERE role='admin'")
     for (admin_name,) in cur.fetchall():
         if admin_name not in bc.admins:
             bc.admins.append(admin_name)
+    # Sync garages from DB into blockchain
+    cur.execute("SELECT username FROM users WHERE role='garage'")
+    for (garage_name,) in cur.fetchall():
+        if garage_name not in bc.garages:
+            bc.garages.append(garage_name)
     bc.save_to_file()
 
-
-# -------------------------
-# Routes
-# -------------------------
+# --- Routes (login/signup/profile same as before) ---
 @app.route("/")
 def index():
     pending_count = len(bc.pending_transactions)
     user = current_user()
     return render_template("index.html", pending_count=pending_count, user=user)
 
-# Signup
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
@@ -151,7 +155,6 @@ def signup():
             flash("Username already taken.", "danger")
     return render_template("signup.html")
 
-#login
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -166,10 +169,8 @@ def login():
         else:
             flash("Invalid username/password.", "danger")
 
-    # 👇 Add this line
     users = get_all_users()
     return render_template("login.html", users=users)
-
 
 @app.route("/logout")
 def logout():
@@ -177,7 +178,6 @@ def logout():
     flash("Logged out.", "info")
     return redirect(url_for("index"))
 
-# quick switch (demo helper) - lists users and logs you in as chosen user
 @app.route("/switch/<username>")
 def quick_switch(username):
     row = get_user_by_username(username)
@@ -188,7 +188,6 @@ def quick_switch(username):
     flash(f"Switched to {row['display_name']}.", "info")
     return redirect(url_for("index"))
 
-# Profile (view/edit)
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
@@ -197,61 +196,49 @@ def profile():
         display_name = request.form.get("display_name") or user["username"]
         password = request.form.get("password") or None
         update_profile(user["username"], display_name, password if password else None)
-        # refresh session display_name
         session["display_name"] = display_name
         flash("Profile updated.", "success")
         return redirect(url_for("profile"))
     return render_template("profile.html", user=user)
 
-# Add vehicle (creates pending tx)
+# --- Vehicle registration unchanged, but restricted to users ---
 @app.route("/add-vehicle", methods=["GET", "POST"])
 @login_required
 def add_vehicle():
     user = current_user()
-
-    # ✅ Only regular users can register vehicles
     if user["role"] != "user":
         flash("Only regular users can register new vehicles.", "warning")
         return redirect(url_for("index"))
-
     if request.method == "POST":
         vin = request.form.get("vin").strip()
         owner = user["username"]
-
-        payload = {
-            "vin": vin,
-            "owner": owner,
-            "action": "register_vehicle",
-            "meta": {"submitted_by": owner}
-        }
-        tx = {
-            "type": "register_vehicle",
-            "payload": payload,
-            "requested_by": owner,
-            "time": time.time()
-        }
-
+        payload = {"vin": vin, "owner": owner, "action": "register_vehicle", "meta": {"submitted_by": owner}}
+        tx = {"type": "register_vehicle", "payload": payload, "requested_by": owner, "time": time.time()}
         tx_id = bc.new_transaction(tx)
         flash(f"Vehicle registration submitted. Transaction ID: {tx_id}", "info")
         return redirect(url_for("index"))
-
     return render_template("add_vehicle.html", user=user)
 
-
-# Add service (AJAX)
-@app.route("/add-service", methods=["POST"])
+# --- NEW: Admin proposes a garage ---
+@app.route("/add-garage", methods=["GET", "POST"])
 @login_required
-def add_service():
-    vin = request.form.get("vin").strip()
+def add_garage():
     user = current_user()
-    garage = user["username"]
-    description = request.form.get("description").strip()
-    payload = {"vin": vin, "garage": garage, "description": description, "action": "add_service"}
-    tx = {"type": "add_service", "payload": payload, "requested_by": garage, "time": time.time()}
-    tx_id = bc.new_transaction(tx)
-    return jsonify({"tx_id": tx_id})
+    if user["role"] != "admin":
+        flash("Only admins can propose a new garage.", "warning")
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username").strip()
+        display_name = request.form.get("display_name").strip() or username
+        # create a propose_garage transaction (admins will vote)
+        payload = {"username": username, "display_name": display_name, "action": "propose_garage", "proposed_by": user["username"]}
+        tx = {"type": "propose_garage", "payload": payload, "requested_by": user["username"], "time": time.time()}
+        tx_id = bc.new_transaction(tx)
+        flash(f"Garage proposal submitted as transaction: {tx_id}", "info")
+        return redirect(url_for("admin_panel"))
+    return render_template("add_garage.html", user=user)
 
-# Admin panel - only display to logged in user (admins will see vote buttons)
+# --- Admin panel ---
 @app.route("/admin")
 @login_required
 def admin_panel():
@@ -262,20 +249,69 @@ def admin_panel():
     users = get_all_users()
     return render_template("admin_panel.html", pending=pending, admins=admins, votes=votes, user=user, users=users)
 
-# Vote endpoint - user must be logged in and an admin
+# --- Voting endpoint (admins and garages use this, depending on tx type) ---
 @app.route("/vote", methods=["POST"])
 @login_required
 def vote():
     user = current_user()
-    if user["role"] != "admin":
-        return jsonify({"error": "not-authorized"}), 403
-
     tx_id = request.json.get("tx_id")
     vote_val = request.json.get("vote")  # 'approve' or 'reject'
-    # Cast using current logged-in admin username
-    result = bc.cast_vote(tx_id, user["username"], vote_val)
+
+    # check permissions depending on transaction type
+    # find tx in pending to know its type
+    tx_record = next((t for t in bc.pending_transactions if t["tx_id"] == tx_id), None)
+    tx_type = tx_record["tx"]["type"] if tx_record else None
+
+    # only admins can vote on 'register_vehicle' and 'propose_garage'
+    if tx_type in ("register_vehicle", "propose_garage"):
+        if user["role"] != "admin":
+            return jsonify({"error": "not-authorized"}), 403
+        voter = user["username"]
+    elif tx_type == "add_service":
+        if user["role"] != "garage":
+            return jsonify({"error": "not-authorized"}), 403
+        voter = user["username"]
+    else:
+        # default: require admin
+        if user["role"] != "admin":
+            return jsonify({"error": "not-authorized"}), 403
+        voter = user["username"]
+
+    result = bc.cast_vote(tx_id, voter, vote_val)
+
+    # If a garage proposal was accepted, create the garage user account automatically
+    if result.get("finalized") == "accepted":
+        tx_info = result.get("tx") or None
+        # if not returned, search recent chain for the tx_id
+        if not tx_info:
+            for block in bc.chain[::-1]:
+                for rec in block.transactions:
+                    if rec.get("tx_id") == tx_id:
+                        tx_info = rec
+                        break
+                if tx_info:
+                    break
+        if tx_info:
+            tx_type_inner = tx_info["tx"].get("type")
+            if tx_type_inner == "propose_garage":
+                payload = tx_info["tx"].get("payload", {})
+                new_username = payload.get("username")
+                display_name = payload.get("display_name") or new_username
+                # create user with default password 'password' (demo). If username exists skip.
+                if not get_user_by_username(new_username):
+                    created = create_user(new_username, "password", role="garage", display_name=display_name)
+                    if created:
+                        flash_msg = f"Garage '{new_username}' approved and account created (password='password')."
+                    else:
+                        flash_msg = f"Garage '{new_username}' approved but account creation failed (already exists)."
+                else:
+                    flash_msg = f"Garage '{new_username}' already exists in DB."
+                # If this request is AJAX (fetch), return message inside result
+                result["garage_created_message"] = flash_msg
+
     return jsonify(result)
 
+# --- Explorer & vehicle history unchanged for now ---
 @app.route("/explorer")
 def explorer():
     chain = bc.get_chain()

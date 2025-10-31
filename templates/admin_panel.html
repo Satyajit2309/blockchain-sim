@@ -11,6 +11,9 @@
         <div class="list-group-item">
           <div><strong>TX ID:</strong> {{ tx.tx_id }}</div>
           <div><strong>Type:</strong> {{ tx.tx.type }}</div>
+            {% if tx.tx.type == 'propose_garage' %}
+              <div class="alert alert-info">Garage Proposal — username: {{ tx.tx.payload.username }}</div>
+            {% endif %}
           <div><strong>Payload:</strong> {{ tx.tx.payload }}</div>
           <div class="mt-2">
             <strong>Votes:</strong>
