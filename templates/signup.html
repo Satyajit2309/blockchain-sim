@@ -18,12 +18,20 @@
     <div class="mb-3">
       <label class="form-label">Role</label>
       <select name="role" class="form-select">
-        <option value="user">User</option>
+        <option value="user">User (Vehicle Owner)</option>
         <option value="admin">Admin (for demo)</option>
+        <option value="garage">Garage (Service Provider)</option>
       </select>
-      <div class="form-text">Choose 'admin' only for demo / testing. In production you'd restrict admin creation.</div>
+      <div class="form-text">
+        <strong>User:</strong> Can register vehicles<br>
+        <strong>Admin:</strong> Validates transactions via consensus<br>
+        <strong>Garage:</strong> Requires admin approval via consensus before account creation
+      </div>
     </div>
     <button class="btn btn-primary" type="submit">Sign up</button>
   </form>
+  <div class="mt-3">
+    <a href="{{ url_for('login') }}">Already have an account? Login</a>
+  </div>
 </div>
 {% endblock %}

@@ -2,9 +2,67 @@
 {% block content %}
   <div class="p-4 bg-white rounded shadow">
     <h3>Welcome to Vehicle Blockchain Simulation</h3>
-    <p>Pending transactions: <strong>{{ pending_count }}</strong></p>
-    <p>Try registering a vehicle, then go to the Admin Panel to approve it.</p>
-    <a class="btn btn-primary" href="{{ url_for('add_vehicle') }}">Register Vehicle</a>
-    <a class="btn btn-secondary" href="{{ url_for('admin_panel') }}">Admin Panel</a>
+    <p class="lead">A decentralized vehicle history tracking system using blockchain consensus</p>
+    
+    <div class="alert alert-info">
+      <strong>Pending transactions:</strong> {{ pending_count }}
+    </div>
+
+    {% if user %}
+      <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">Your Role: {{ user.role|upper }}</h5>
+        </div>
+        <div class="card-body">
+          {% if user.role == 'user' %}
+            <p>As a <strong>Vehicle Owner</strong>, you can:</p>
+            <ul>
+              <li>Register new vehicles to the blockchain</li>
+              <li>View vehicle history and service records</li>
+            </ul>
+            <a class="btn btn-primary" href="{{ url_for('add_vehicle') }}">Register Vehicle</a>
+          {% elif user.role == 'admin' %}
+            <p>As an <strong>Admin</strong>, you can:</p>
+            <ul>
+              <li>Vote on vehicle registration requests</li>
+              <li>Propose and approve new garages to join the network</li>
+              <li>View and validate transactions requiring consensus</li>
+            </ul>
+            <a class="btn btn-primary me-2" href="{{ url_for('admin_panel') }}">Admin Panel</a>
+            <a class="btn btn-secondary" href="{{ url_for('add_garage') }}">Propose Garage</a>
+          {% elif user.role == 'garage' %}
+            <p>As a <strong>Garage</strong>, you can:</p>
+            <ul>
+              <li>Submit service records for vehicles</li>
+              <li>Vote on service records from other garages</li>
+              <li>Build verifiable service history on the blockchain</li>
+            </ul>
+            <a class="btn btn-primary me-2" href="{{ url_for('garage_add_service') }}">Add Service Record</a>
+            <a class="btn btn-secondary" href="{{ url_for('garage_panel') }}">Garage Panel</a>
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="alert alert-warning mt-4">
+        <strong>Not logged in.</strong> Please login or sign up to interact with the blockchain.
+      </div>
+      <a class="btn btn-primary me-2" href="{{ url_for('login') }}">Login</a>
+      <a class="btn btn-secondary" href="{{ url_for('signup') }}">Sign Up</a>
+    {% endif %}
+
+    <div class="card mt-4">
+      <div class="card-header">
+        <h5 class="mb-0">How It Works</h5>
+      </div>
+      <div class="card-body">
+        <ol>
+          <li><strong>Decentralized Validation:</strong> Admins validate vehicle registrations and garage additions through consensus voting</li>
+          <li><strong>Garage Consensus:</strong> Service records require approval from multiple garages before being added to the blockchain</li>
+          <li><strong>Immutable Records:</strong> Once approved, transactions are permanently recorded in the blockchain</li>
+          <li><strong>Transparent History:</strong> Anyone can view the complete blockchain and vehicle service history</li>
+        </ol>
+        <a class="btn btn-outline-primary" href="{{ url_for('explorer') }}">Explore Blockchain</a>
+      </div>
+    </div>
   </div>
 {% endblock %}

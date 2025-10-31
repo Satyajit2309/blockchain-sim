@@ -146,12 +146,33 @@ def signup():
         password = request.form.get("password")
         role = request.form.get("role", "user")
         display_name = request.form.get("display_name") or username
-        success = create_user(username, password, role, display_name)
-        if success:
-            flash("Account created. You can now log in.", "success")
+        
+        # If role is garage, create a proposal transaction instead
+        if role == "garage":
+            payload = {
+                "username": username,
+                "password": password,  # Store for later user creation
+                "display_name": display_name,
+                "action": "propose_garage",
+                "proposed_by": "signup"
+            }
+            tx = {
+                "type": "propose_garage",
+                "payload": payload,
+                "requested_by": "signup",
+                "time": time.time()
+            }
+            tx_id = bc.new_transaction(tx)
+            flash(f"Garage registration submitted for admin approval. Transaction ID: {tx_id}", "info")
             return redirect(url_for("login"))
         else:
-            flash("Username already taken.", "danger")
+            # Regular user or admin creation
+            success = create_user(username, password, role, display_name)
+            if success:
+                flash("Account created. You can now log in.", "success")
+                return redirect(url_for("login"))
+            else:
+                flash("Username already taken.", "danger")
     return render_template("signup.html")
 
 @app.route("/login", methods=["GET", "POST"])
@@ -229,7 +250,14 @@ def add_garage():
     if request.method == "POST":
         username = request.form.get("username").strip()
         display_name = request.form.get("display_name").strip() or username
-        payload = {"username": username, "display_name": display_name, "action": "propose_garage", "proposed_by": user["username"]}
+        password = request.form.get("password", "password")
+        payload = {
+            "username": username,
+            "password": password,
+            "display_name": display_name,
+            "action": "propose_garage",
+            "proposed_by": user["username"]
+        }
         tx = {"type": "propose_garage", "payload": payload, "requested_by": user["username"], "time": time.time()}
         tx_id = bc.new_transaction(tx)
         flash(f"Garage proposal submitted as transaction: {tx_id}", "info")
@@ -247,19 +275,46 @@ def garage_add_service():
     if request.method == "POST":
         vin = request.form.get("vin").strip().upper()
         description = request.form.get("description").strip()
-        payload = {"vin": vin, "garage": user["username"], "description": description, "action": "add_service", "submitted_by": user["username"]}
-        tx = {"type": "add_service", "payload": payload, "requested_by": user["username"], "time": time.time()}
+        payload = {
+            "vin": vin,
+            "garage": user["username"],
+            "description": description,
+            "action": "add_service",
+            "submitted_by": user["username"]
+        }
+        tx = {
+            "type": "add_service",
+            "payload": payload,
+            "requested_by": user["username"],
+            "time": time.time()
+        }
         tx_id = bc.new_transaction(tx)
-        flash(f"Service record submitted. Transaction ID: {tx_id}", "info")
-        return redirect(url_for("index"))
+        flash(f"Service record submitted for garage consensus. Transaction ID: {tx_id}", "info")
+        return redirect(url_for("garage_panel"))
     return render_template("garage_add_service.html", user=user)
+
+# --- Garage panel (shows pending service txs) ---
+@app.route("/garage")
+@login_required
+def garage_panel():
+    user = current_user()
+    if user["role"] != "garage":
+        flash("Only garages can access this panel.", "warning")
+        return redirect(url_for("index"))
+    
+    # Filter pending transactions for service records only
+    pending = [tx for tx in bc.pending_transactions if tx["tx"]["type"] == "add_service"]
+    garages = bc.garages
+    votes = bc.votes
+    return render_template("garage_panel.html", pending=pending, garages=garages, votes=votes, user=user)
 
 # --- Admin panel (shows pending txs) ---
 @app.route("/admin")
 @login_required
 def admin_panel():
     user = current_user()
-    pending = bc.pending_transactions
+    # Filter pending transactions for admin-relevant types
+    pending = [tx for tx in bc.pending_transactions if tx["tx"]["type"] in ("register_vehicle", "propose_garage")]
     admins = bc.admins
     votes = bc.votes
     users = get_all_users()
@@ -294,7 +349,7 @@ def vote():
     # cast vote
     result = bc.cast_vote(tx_id, voter, vote_val)
 
-    # If a garage proposal was accepted -> create garage user (handled earlier)
+    # If a garage proposal was accepted -> create garage user
     if result.get("finalized") == "accepted":
         tx_info = result.get("tx")
         if not tx_info:
@@ -313,10 +368,11 @@ def vote():
                 payload = tx_info["tx"].get("payload", {})
                 new_username = payload.get("username")
                 display_name = payload.get("display_name") or new_username
+                password = payload.get("password", "password")
                 if not get_user_by_username(new_username):
-                    created = create_user(new_username, "password", role="garage", display_name=display_name)
+                    created = create_user(new_username, password, role="garage", display_name=display_name)
                     if created:
-                        result["garage_created_message"] = f"Garage '{new_username}' created (password= 'password')."
+                        result["garage_created_message"] = f"Garage '{new_username}' created successfully."
                     else:
                         result["garage_created_message"] = f"Garage '{new_username}' could not be created (exists?)."
 
@@ -355,3 +411,11 @@ def api_pending():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
+
+
+# UPDATED TEMPLATES NEEDED:
+# 1. templates/signup.html - Add garage option
+# 2. templates/add_garage.html - Add password field
+# 3. templates/garage_add_service.html - Fix to be service form, not history
+# 4. templates/garage_panel.html - NEW: Voting panel for garages
+# 5. templates/base.html - Add garage panel link
