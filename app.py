@@ -388,11 +388,34 @@ def vote():
     return jsonify(result)
 
 # --- Explorer & vehicle history ---
+# --- Explorer & vehicle history ---
 @app.route("/explorer")
 def explorer():
     chain = bc.get_chain()
     user = current_user()
     return render_template("explorer.html", chain=chain, user=user)
+
+#
+# --- ADD THIS NEW ROUTE ---
+#
+@app.route("/search-vehicle", methods=["POST"])
+def search_vehicle():
+    """
+    Handle VIN search form submission.
+    Redirects to the specific vehicle history page.
+    """
+    # Get the VIN from the form, clean it up
+    vin = request.form.get("vin", "").strip().upper()
+    
+    if not vin:
+        flash("Please enter a VIN to search.", "warning")
+        return redirect(url_for("explorer"))
+    
+    # Redirect to the existing page that displays vehicle history
+    return redirect(url_for("vehicle_history", vin=vin))
+#
+# --- END OF NEW ROUTE ---
+#
 
 @app.route("/vehicle/<vin>")
 def vehicle_history(vin):

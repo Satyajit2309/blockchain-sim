@@ -26,7 +26,7 @@
               </div>
               <span class="badge bg-warning">
                 {% set v = votes.get(record.tx_id, {}) %}
-                Votes: {{ v.values()|list|selectattr('__eq__', 'approve')|list|length }} / {{ (garages|length // 2) + 1 }}
+                Votes: {{ v.values()|select('equalto', 'approve')|list|length }} / {{ (garages|length // 2) + 1 }}
               </span>
             </div>
 

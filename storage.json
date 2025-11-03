@@ -113,9 +113,80 @@
       "previous_hash": "00019794ebde32b5b5246e8106d91fc6511f65bf052645660c54cc95dfca8f66",
       "nonce": 28,
       "hash": "002830b2f320cfea3457300b6a7db9ffe9853fdefa7a8189a9b3e8ed689071ff"
+    },
+    {
+      "index": 5,
+      "timestamp": 1761909465.7976956,
+      "transactions": [
+        {
+          "tx_id": "588f987179b0b13b219fadf1c079218b7bc4a286e1ca3349f08d02bf5aac1413",
+          "tx": {
+            "type": "propose_garage",
+            "payload": {
+              "username": "NEXA",
+              "password": "12345",
+              "display_name": "NEXA",
+              "action": "propose_garage",
+              "proposed_by": "MoSalah11"
+            },
+            "requested_by": "MoSalah11",
+            "time": 1761909426.4340277
+          },
+          "time_submitted": 1761909426.4340632,
+          "status": "accepted"
+        }
+      ],
+      "previous_hash": "002830b2f320cfea3457300b6a7db9ffe9853fdefa7a8189a9b3e8ed689071ff",
+      "nonce": 237,
+      "hash": "00eb541369fad892676a0d3381a88371c5da47b3d828f21b1b74fcf86090adab"
+    },
+    {
+      "index": 6,
+      "timestamp": 1761910208.3271754,
+      "transactions": [
+        {
+          "tx_id": "d4240699e564c0a3002fe481c7668ca3ec13862c78ee603fee65fc1a73a5c603",
+          "tx": {
+            "type": "register_vehicle",
+            "payload": {
+              "vin": "MYCAR1",
+              "owner": "owner1",
+              "action": "register_vehicle",
+              "meta": {
+                "submitted_by": "owner1"
+              }
+            },
+            "requested_by": "owner1",
+            "time": 1761910170.9594622
+          },
+          "time_submitted": 1761910170.9595227,
+          "status": "accepted"
+        }
+      ],
+      "previous_hash": "00eb541369fad892676a0d3381a88371c5da47b3d828f21b1b74fcf86090adab",
+      "nonce": 40,
+      "hash": "002858eacbdb608965df87268b244a5fdda33fb1d0967bff1920b0d1d89b1d3a"
     }
   ],
-  "pending_transactions": [],
+  "pending_transactions": [
+    {
+      "tx_id": "23f151d9c54bdd6c189ec5b3dee4637f5aa2ed36f71b94f90c640397d2f48b01",
+      "tx": {
+        "type": "propose_garage",
+        "payload": {
+          "username": "bmw_pune",
+          "password": "123",
+          "display_name": "bmw",
+          "action": "propose_garage",
+          "proposed_by": "bob"
+        },
+        "requested_by": "bob",
+        "time": 1761910266.9759998
+      },
+      "time_submitted": 1761910266.9760332,
+      "status": "pending"
+    }
+  ],
   "admins": [
     "alice",
     "bob",
@@ -124,7 +195,12 @@
     "alice123"
   ],
   "garages": [
-    "Garve Honda"
+    "Garve Honda",
+    "NEXA"
   ],
-  "votes": {}
+  "votes": {
+    "23f151d9c54bdd6c189ec5b3dee4637f5aa2ed36f71b94f90c640397d2f48b01": {
+      "bob": "approve"
+    }
+  }
 }
