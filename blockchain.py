@@ -95,7 +95,7 @@ class Blockchain:
             total = len(self.admins)
         else:
             tx_type = tx_record["tx"].get("type")
-            if tx_type in ("propose_garage", "register_vehicle"):
+            if tx_type in ("propose_garage", "register_vehicle", "transfer_ownership"):
                 total = len(self.admins)
             elif tx_type == "add_service":
                 total = len(self.garages) if len(self.garages) > 0 else 1
@@ -165,6 +165,51 @@ class Blockchain:
         if 0 <= index < len(self.chain):
             return self.chain[index].to_dict()
         return None
+
+    # -------------------------
+    # Ownership tracking - NEW METHODS
+    # -------------------------
+    def get_current_owner(self, vin: str) -> Optional[str]:
+        """Get the current owner of a vehicle by traversing the chain"""
+        current_owner = None
+        for block in self.chain:
+            for tx_record in block.transactions:
+                tx = tx_record.get("tx", {})
+                payload = tx.get("payload", {})
+                if payload.get("vin") == vin:
+                    if tx.get("type") == "register_vehicle":
+                        current_owner = payload.get("owner")
+                    elif tx.get("type") == "transfer_ownership":
+                        current_owner = payload.get("to_owner")
+        return current_owner
+    
+    def get_vehicles_by_owner(self, owner: str) -> List[Dict[str,Any]]:
+        """Get all vehicles currently owned by a user"""
+        vehicles = {}  # vin -> ownership data
+        
+        for block in self.chain:
+            for tx_record in block.transactions:
+                tx = tx_record.get("tx", {})
+                payload = tx.get("payload", {})
+                vin = payload.get("vin")
+                
+                if not vin:
+                    continue
+                
+                if tx.get("type") == "register_vehicle":
+                    vehicles[vin] = {
+                        "vin": vin,
+                        "current_owner": payload.get("owner"),
+                        "registered_at": block.timestamp,
+                        "block_index": block.index
+                    }
+                elif tx.get("type") == "transfer_ownership":
+                    if vin in vehicles:
+                        vehicles[vin]["current_owner"] = payload.get("to_owner")
+                        vehicles[vin]["last_transfer"] = block.timestamp
+        
+        # Filter only vehicles owned by the specified owner
+        return [v for v in vehicles.values() if v["current_owner"] == owner]
 
     # -------------------------
     # Vehicle-specific chain ops
@@ -250,7 +295,7 @@ class Blockchain:
     def get_vehicle_history(self, vin: str) -> Dict[str,Any]:
         """
         Return an object containing:
-          - global_events: service/registration events found in global chain
+          - global_events: service/registration/transfer events found in global chain
           - vehicle_chain: per-vehicle chain file (if any)
         """
         global_events = []

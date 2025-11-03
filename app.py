@@ -48,6 +48,12 @@ def get_all_users():
     cur.execute("SELECT id, username, role, display_name FROM users ORDER BY username")
     return cur.fetchall()
 
+def get_users_by_role(role):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT id, username, display_name FROM users WHERE role = ? ORDER BY username", (role,))
+    return cur.fetchall()
+
 def update_profile(username, display_name, password=None):
     db = get_db()
     cur = db.cursor()
@@ -239,6 +245,65 @@ def add_vehicle():
         return redirect(url_for("index"))
     return render_template("add_vehicle.html", user=user)
 
+# --- Transfer ownership (users only) ---
+@app.route("/transfer-ownership", methods=["GET", "POST"])
+@login_required
+def transfer_ownership():
+    user = current_user()
+    if user["role"] != "user":
+        flash("Only regular users can transfer vehicle ownership.", "warning")
+        return redirect(url_for("index"))
+    
+    if request.method == "POST":
+        vin = request.form.get("vin").strip().upper()
+        new_owner = request.form.get("new_owner").strip()
+        
+        # Verify the current user owns this vehicle
+        ownership = bc.get_current_owner(vin)
+        if ownership != user["username"]:
+            flash(f"You are not the current owner of VIN: {vin}", "danger")
+            return redirect(url_for("transfer_ownership"))
+        
+        # Verify new owner exists and is a user
+        new_owner_record = get_user_by_username(new_owner)
+        if not new_owner_record:
+            flash(f"User '{new_owner}' does not exist.", "danger")
+            return redirect(url_for("transfer_ownership"))
+        
+        if new_owner_record["role"] != "user":
+            flash("Can only transfer ownership to regular users.", "danger")
+            return redirect(url_for("transfer_ownership"))
+        
+        payload = {
+            "vin": vin,
+            "from_owner": user["username"],
+            "to_owner": new_owner,
+            "action": "transfer_ownership",
+            "meta": {"submitted_by": user["username"]}
+        }
+        tx = {"type": "transfer_ownership", "payload": payload, "requested_by": user["username"], "time": time.time()}
+        tx_id = bc.new_transaction(tx)
+        flash(f"Ownership transfer submitted for admin approval. Transaction ID: {tx_id}", "info")
+        return redirect(url_for("my_vehicles"))
+    
+    # Get vehicles owned by current user
+    my_vehicles = bc.get_vehicles_by_owner(user["username"])
+    all_users = get_users_by_role("user")
+    
+    return render_template("transfer_ownership.html", user=user, my_vehicles=my_vehicles, all_users=all_users)
+
+# --- My vehicles page ---
+@app.route("/my-vehicles")
+@login_required
+def my_vehicles():
+    user = current_user()
+    if user["role"] != "user":
+        flash("Only regular users can view their vehicles.", "warning")
+        return redirect(url_for("index"))
+    
+    vehicles = bc.get_vehicles_by_owner(user["username"])
+    return render_template("my_vehicles.html", user=user, vehicles=vehicles)
+
 # --- Propose garage (admins) ---
 @app.route("/add-garage", methods=["GET", "POST"])
 @login_required
@@ -314,7 +379,7 @@ def garage_panel():
 def admin_panel():
     user = current_user()
     # Filter pending transactions for admin-relevant types
-    pending = [tx for tx in bc.pending_transactions if tx["tx"]["type"] in ("register_vehicle", "propose_garage")]
+    pending = [tx for tx in bc.pending_transactions if tx["tx"]["type"] in ("register_vehicle", "propose_garage", "transfer_ownership")]
     admins = bc.admins
     votes = bc.votes
     users = get_all_users()
@@ -333,7 +398,7 @@ def vote():
     tx_type = tx_record["tx"]["type"] if tx_record else None
 
     # permission checks
-    if tx_type in ("register_vehicle", "propose_garage"):
+    if tx_type in ("register_vehicle", "propose_garage", "transfer_ownership"):
         if user["role"] != "admin":
             return jsonify({"error": "not-authorized"}), 403
         voter = user["username"]
@@ -388,34 +453,11 @@ def vote():
     return jsonify(result)
 
 # --- Explorer & vehicle history ---
-# --- Explorer & vehicle history ---
 @app.route("/explorer")
 def explorer():
     chain = bc.get_chain()
     user = current_user()
     return render_template("explorer.html", chain=chain, user=user)
-
-#
-# --- ADD THIS NEW ROUTE ---
-#
-@app.route("/search-vehicle", methods=["POST"])
-def search_vehicle():
-    """
-    Handle VIN search form submission.
-    Redirects to the specific vehicle history page.
-    """
-    # Get the VIN from the form, clean it up
-    vin = request.form.get("vin", "").strip().upper()
-    
-    if not vin:
-        flash("Please enter a VIN to search.", "warning")
-        return redirect(url_for("explorer"))
-    
-    # Redirect to the existing page that displays vehicle history
-    return redirect(url_for("vehicle_history", vin=vin))
-#
-# --- END OF NEW ROUTE ---
-#
 
 @app.route("/vehicle/<vin>")
 def vehicle_history(vin):
@@ -434,11 +476,3 @@ def api_pending():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
-
-
-# UPDATED TEMPLATES NEEDED:
-# 1. templates/signup.html - Add garage option
-# 2. templates/add_garage.html - Add password field
-# 3. templates/garage_add_service.html - Fix to be service form, not history
-# 4. templates/garage_panel.html - NEW: Voting panel for garages
-# 5. templates/base.html - Add garage panel link

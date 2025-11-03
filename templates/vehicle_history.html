@@ -1,146 +1,117 @@
 {% extends "base.html" %}
 {% block content %}
-
-<style>
-  /* Container for the horizontal chain */
-  .chain-visualization-container {
-    display: flex;
-    align-items: stretch; /* Make blocks same height */
-    overflow-x: auto;   /* Allow horizontal scrolling */
-    padding: 20px 10px;
-    background-color: #f8f9fa; /* Light grey background */
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-  }
-
-  /* Represents the "link" or "arrow" between blocks */
-  .chain-connector {
-    flex: 0 0 40px; /* Fixed width for the connector */
-    align-self: center; /* Center the arrow vertically */
-    text-align: center;
-    font-size: 2rem;  /* Make arrow bigger */
-    color: #0d6efd;   /* Bootstrap primary blue */
-    font-weight: bold;
-  }
-
-  /* A single block in the chain */
-  .chain-block {
-    flex: 0 0 320px; /* Fixed width for each block */
-    border: 1px solid #adb5bd;
-    border-radius: 8px;
-    background-color: #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column; /* Stack content vertically */
-  }
-  
-  .chain-block .card-header {
-    background-color: #e9ecef;
-    border-bottom: 1px solid #adb5bd;
-    font-weight: bold;
-  }
-  
-  .chain-block .card-body {
-    padding: 1rem;
-    font-size: 0.9rem;
-    flex-grow: 1; /* Allow body to fill space */
-  }
-  
-  .chain-block .card-body p {
-    margin-bottom: 0.5rem;
-    word-wrap: break-word; /* Break long strings like hashes */
-  }
-
-  /* Special style for the first block (Genesis) */
-  .chain-block.genesis-block .card-header {
-    background-color: #d1e7dd; /* Bootstrap success-light */
-    border-color: #a3cfbb;
-  }
-</style>
-<div class="p-3 bg-white rounded shadow">
+  <div class="p-3 bg-white rounded shadow">
     <h4>Vehicle History for VIN: <span class="badge bg-primary">{{ vin }}</span></h4>
 
-    <h5 class="mt-4">📋 Registration & Ownership (Global Chain)</h5>
+    <h5 class="mt-4">📋 Registration & Ownership History (Global Chain)</h5>
     {% if data.global_events %}
-      <ul class="list-group mb-3">
+      <div class="ownership-timeline mb-3">
         {% for ev in data.global_events %}
-          <li class="list-group-item">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <strong class="badge bg-info">{{ ev.type }}</strong>
-                <div class="mt-2">
-                  {% if ev.type == 'register_vehicle' %}
-                    <strong>Owner:</strong> {{ ev.payload.owner }}<br>
-                    <strong>Registered by:</strong> {{ ev.payload.meta.submitted_by }}
-                  {% else %}
-                    {{ ev.payload }}
-                  {% endif %}
-                </div>
-              </div>
-              <small class="text-muted">
-                Block #{{ ev.block_index }}<br>
-                {{ ev.timestamp|int }}
-              </small>
+          <div class="timeline-block" data-type="{{ ev.type }}">
+            <div class="timeline-icon">
+              {% if ev.type == 'register_vehicle' %}
+                🚗
+              {% elif ev.type == 'transfer_ownership' %}
+                🔄
+              {% else %}
+                📝
+              {% endif %}
             </div>
-          </li>
+            <div class="timeline-content">
+              <div class="timeline-header">
+                <span class="badge bg-{% if ev.type == 'register_vehicle' %}success{% elif ev.type == 'transfer_ownership' %}warning{% else %}info{% endif %}">
+                  {{ ev.type.replace('_', ' ').title() }}
+                </span>
+                <small class="text-muted">Block #{{ ev.block_index }}</small>
+              </div>
+              <div class="timeline-body">
+                {% if ev.type == 'register_vehicle' %}
+                  <p class="mb-1"><strong>Initial Owner:</strong> {{ ev.payload.owner }}</p>
+                  <p class="mb-0"><small class="text-muted">Registered by: {{ ev.payload.meta.submitted_by }}</small></p>
+                {% elif ev.type == 'transfer_ownership' %}
+                  <div class="transfer-visualization">
+                    <div class="transfer-box from-owner">
+                      <div class="transfer-label">From</div>
+                      <div class="transfer-name">{{ ev.payload.from_owner }}</div>
+                    </div>
+                    <div class="transfer-arrow">→</div>
+                    <div class="transfer-box to-owner">
+                      <div class="transfer-label">To</div>
+                      <div class="transfer-name">{{ ev.payload.to_owner }}</div>
+                    </div>
+                  </div>
+                  <p class="mb-0 mt-2"><small class="text-muted">Submitted by: {{ ev.payload.meta.submitted_by }}</small></p>
+                {% else %}
+                  <p>{{ ev.payload }}</p>
+                {% endif %}
+              </div>
+              <div class="timeline-footer">
+                <small class="text-muted">Timestamp: {{ ev.timestamp|int }}</small>
+              </div>
+            </div>
+          </div>
         {% endfor %}
-      </ul>
+      </div>
     {% else %}
       <div class="alert alert-secondary">No registration records found for this VIN in the global chain.</div>
     {% endif %}
 
-    
     <h5 class="mt-4">🔧 Service Records (Vehicle-Specific Chain)</h5>
-    
-    {% if data.vehicle_chain.chain and data.vehicle_chain.chain|length > 0 %}
-      <div class="chain-visualization-container">
-        
+    {% if data.vehicle_chain.chain and data.vehicle_chain.chain|length > 1 %}
+      <div class="accordion" id="vchain">
         {% for block in data.vehicle_chain.chain %}
-          <div class="chain-block card {% if block.index == 0 %}genesis-block{% endif %}">
-            <div class="card-header">
-              {% if block.index == 0 %}
-                Genesis Block
-              {% else %}
-                Block #{{ block.index }}
-              {% endif %}
-            </div>
-            <div class="card-body">
-              <p><strong>Hash:</strong><br><code>{{ block.hash[:20] }}...</code></p>
-              <p><strong>Prev. Hash:</strong><br><code>{{ block.previous_hash[:20] }}...</code></p>
-              <p><strong>Timestamp:</strong><br>{{ block.timestamp|int }}</p>
-              <p><strong>Nonce:</strong> {{ block.nonce }}</p>
-              
-              {% if block.index > 0 %}
-                <hr>
-                <strong>Service Records:</strong>
-                <div class="list-group list-group-flush">
+          {% if block.index > 0 %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="h{{ loop.index }}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c{{ loop.index }}">
+                Block #{{ block.index }} — Hash: {{ block.hash[:20] }}... 
+                <span class="badge bg-success ms-2">{{ block.transactions|length }} service(s)</span>
+              </button>
+            </h2>
+            <div id="c{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#vchain">
+              <div class="accordion-body">
+                <p><strong>Block Index:</strong> {{ block.index }}</p>
+                <p><strong>Timestamp:</strong> {{ block.timestamp }}</p>
+                <p><strong>Previous Hash:</strong> <code>{{ block.previous_hash[:40] }}...</code></p>
+                <p><strong>Block Hash:</strong> <code>{{ block.hash[:40] }}...</code></p>
+                <p><strong>Nonce:</strong> {{ block.nonce }}</p>
+                <p><strong>Service Records:</strong></p>
+                <div class="list-group">
                 {% for txr in block.transactions %}
-                  <div class="list-group-item px-0 py-1">
-                      <span class="badge bg-success">{{ txr.tx.type }}</span>
-                      <p class="mb-0 small">
-                        <strong>Garage:</strong> {{ txr.tx.payload.garage }}<br>
-                        <strong>Service:</strong> {{ txr.tx.payload.description }}
-                      </p>
+                  <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <h6 class="mb-1">
+                          <span class="badge bg-success">{{ txr.tx.type }}</span>
+                        </h6>
+                        <p class="mb-1">
+                          <strong>Garage:</strong> {{ txr.tx.payload.garage }}<br>
+                          <strong>Service:</strong> {{ txr.tx.payload.description }}
+                        </p>
+                        <small class="text-muted">TX ID: {{ txr.tx_id }}</small>
+                      </div>
+                      <span class="badge bg-{{ 'success' if txr.status == 'accepted' else 'warning' }}">
+                        {{ txr.status }}
+                      </span>
+                    </div>
                   </div>
                 {% endfor %}
                 </div>
-              {% endif %}
+              </div>
             </div>
           </div>
-
-          {% if not loop.last %}
-            <div class="chain-connector">
-              →
-            </div>
           {% endif %}
-
         {% endfor %}
       </div>
     {% else %}
       <div class="alert alert-secondary">
-        No service record chain (including Genesis) exists for this vehicle yet.
+        No service records have been added to this vehicle's blockchain yet.
+        {% if data.vehicle_chain.chain %}
+          <div class="mt-2"><small>Genesis block exists, waiting for first service record.</small></div>
+        {% endif %}
       </div>
     {% endif %}
+
     <div class="mt-4">
       <a href="{{ url_for('explorer') }}" class="btn btn-secondary">← Back to Explorer</a>
     </div>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-4 bg-white rounded shadow">
+  <h4>Transfer Vehicle Ownership</h4>
+  <p class="text-muted">Transfer requires admin consensus approval before completion.</p>
+
+  {% if my_vehicles %}
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Select Vehicle to Transfer</label>
+        <select name="vin" class="form-select" required>
+          <option value="">-- Select VIN --</option>
+          {% for vehicle in my_vehicles %}
+            <option value="{{ vehicle.vin }}">{{ vehicle.vin }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Transfer To (Username)</label>
+        <select name="new_owner" class="form-select" required>
+          <option value="">-- Select New Owner --</option>
+          {% for u in all_users %}
+            {% if u.username != user.username %}
+              <option value="{{ u.username }}">{{ u.display_name or u.username }} ({{ u.username }})</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+        <div class="form-text">Only registered vehicle owners can receive transfers</div>
+      </div>
+
+      <button class="btn btn-primary" type="submit">Submit Transfer Request</button>
+      <a href="{{ url_for('my_vehicles') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+  {% else %}
+    <div class="alert alert-info">
+      <strong>No vehicles to transfer.</strong> You must own at least one vehicle to transfer ownership.
+    </div>
+    <a href="{{ url_for('add_vehicle') }}" class="btn btn-primary">Register a Vehicle</a>
+  {% endif %}
+</div>
+{% endblock %}
